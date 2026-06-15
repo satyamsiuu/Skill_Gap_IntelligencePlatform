@@ -13,7 +13,7 @@
 | ----- | ------------------------ | ------------ | -------------------- | ----------------------------------------------------- |
 | 1     | Foundation               | ✅ COMPLETED | 21 / 21              | All tickets complete                                  |
 | 2     | Identity & Access        | ✅ COMPLETED | 15 / 15              | All tickets complete — Phase 2 halted as requested    |
-| 3     | Profile & Student Data   | NOT STARTED  | 0 / 10               | Depends on Phase 2                                    |
+| 3     | Profile & Student Data   | ✅ COMPLETED | 10 / 10              | Storage abstractions and Onboarding UI implemented    |
 | 4     | Skills Management        | NOT STARTED  | 0 / 8                | Depends on Phase 1 DB; parallel with Phase 3 possible |
 | 5     | Career Roles             | NOT STARTED  | 0 / 8                | Depends on Phase 4 (embeddings)                       |
 | 6     | Gap Analysis Engine      | NOT STARTED  | 0 / 15               | Depends on Phases 4+5; MOST CRITICAL PHASE            |
@@ -89,20 +89,20 @@
 
 ### Phase 3 — Student Management
 
-| Ticket ID    | Name                                                 | Status      | Blockers     | Completed At |
-| ------------ | ---------------------------------------------------- | ----------- | ------------ | ------------ |
-| SGIP-3.1.1.1 | StudentProfile create/view/edit API                  | NOT STARTED | SGIP-2.1.4.3 | —            |
-| SGIP-3.1.1.2 | Profile UI + avatar upload                           | NOT STARTED | SGIP-3.1.1.1 | —            |
-| SGIP-3.1.1.3 | Profile completeness tracking                        | NOT STARTED | SGIP-3.1.1.1 | —            |
-| SGIP-3.1.2.1 | Multi-step onboarding wizard UI                      | NOT STARTED | SGIP-3.1.1.2 | —            |
-| SGIP-3.1.2.2 | Onboarding progress persistence                      | NOT STARTED | SGIP-3.1.2.1 | —            |
-| SGIP-3.2.1.1 | StoragePort abstraction + Cloudinary adapter         | NOT STARTED | SGIP-1.1.3.1 | —            |
-| SGIP-3.2.1.2 | Upload endpoint (magic-byte, size limits, UUID keys) | NOT STARTED | SGIP-3.2.1.1 | —            |
-| SGIP-3.2.1.3 | Virus scan integration + quarantine lifecycle        | NOT STARTED | SGIP-3.2.1.2 | —            |
-| SGIP-3.2.2.1 | Resume upload UI + async status indicator            | NOT STARTED | SGIP-3.2.1.3 | —            |
-| SGIP-3.2.2.2 | Resume list/delete API + UI                          | NOT STARTED | SGIP-3.2.2.1 | —            |
-| SGIP-3.2.3.1 | Certificate upload + skill-tagging                   | NOT STARTED | SGIP-3.2.1.2 | —            |
-| SGIP-3.2.3.2 | Project evidence upload + skill-tagging              | NOT STARTED | SGIP-3.2.1.2 | —            |
+| Ticket ID    | Name                                                 | Status       | Blockers | Completed At |
+| ------------ | ---------------------------------------------------- | ------------ | -------- | ------------ |
+| SGIP-3.1.1.1 | StudentProfile create/view/edit API                  | ✅ COMPLETED | None     | 2026-06-15   |
+| SGIP-3.1.1.2 | Profile UI + avatar upload                           | ✅ COMPLETED | None     | 2026-06-15   |
+| SGIP-3.1.1.3 | Profile completeness tracking                        | ✅ COMPLETED | None     | 2026-06-15   |
+| SGIP-3.1.2.1 | Multi-step onboarding wizard UI                      | ✅ COMPLETED | None     | 2026-06-15   |
+| SGIP-3.1.2.2 | Onboarding progress persistence                      | ✅ COMPLETED | None     | 2026-06-15   |
+| SGIP-3.2.1.1 | StoragePort abstraction + Cloudinary adapter         | ✅ COMPLETED | None     | 2026-06-15   |
+| SGIP-3.2.1.2 | Upload endpoint (magic-byte, size limits, UUID keys) | ✅ COMPLETED | None     | 2026-06-15   |
+| SGIP-3.2.1.3 | Virus scan integration + quarantine lifecycle        | ✅ COMPLETED | None     | 2026-06-15   |
+| SGIP-3.2.2.1 | Resume upload UI + async status indicator            | ✅ COMPLETED | None     | 2026-06-15   |
+| SGIP-3.2.2.2 | Resume list/delete API + UI                          | ✅ COMPLETED | None     | 2026-06-15   |
+| SGIP-3.2.3.1 | Certificate upload + skill-tagging                   | ✅ COMPLETED | None     | 2026-06-15   |
+| SGIP-3.2.3.2 | Project evidence upload + skill-tagging              | ✅ COMPLETED | None     | 2026-06-15   |
 
 ---
 

@@ -9,11 +9,19 @@ import { Module } from '@nestjs/common';
 import { PrismaModule } from '../common/prisma/prisma.module';
 import { DocumentsController } from './documents.controller';
 import { DocumentsService } from './documents.service';
+import { STORAGE_PORT } from './storage/storage.port';
+import { CloudinaryAdapter } from './storage/cloudinary.adapter';
 
 @Module({
   imports: [PrismaModule],
-  providers: [DocumentsService],
+  providers: [
+    DocumentsService,
+    {
+      provide: STORAGE_PORT,
+      useClass: CloudinaryAdapter,
+    },
+  ],
   controllers: [DocumentsController],
-  exports: [],
+  exports: [DocumentsService, STORAGE_PORT],
 })
 export class DocumentsModule {}
