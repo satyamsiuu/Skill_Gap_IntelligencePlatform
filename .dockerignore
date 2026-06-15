@@ -1,0 +1,51 @@
+# SGIP — Root .dockerignore
+# Prevents unnecessary files from being sent to Docker build context.
+
+# VCS
+.git
+.gitignore
+.gitattributes
+
+# CI / tooling
+.github
+.husky
+
+# Documentation (not needed in image)
+*.md
+docs/
+01-PRD.md
+02-Technical-Architecture.md
+03-Security-Access-Control.md
+04-Frontend-Specification.md
+05-Feature-Ticket-List.md
+SESSION_HANDOFF.md
+PROJECT_PROGRESS.md
+IMPLEMENTATION_LOG.md
+IMPLEMENTATION_STRATEGY.md
+ARCHITECTURE_DECISIONS.md
+KNOWN_ISSUES.md
+
+# Build artifacts
+node_modules
+**/node_modules
+**/.next
+**/dist
+
+# Test files
+**/*.spec.ts
+**/*.test.ts
+**/test/
+**/__tests__/
+
+# Local env files (secrets NEVER go in Docker)
+**/.env
+**/.env.local
+**/.env.*.local
+!**/.env.example
+
+# Dev configs that don't belong in prod image
+.dependency-cruiser.cjs
+**/eslint.config.*
+**/.prettierrc
+**/.lintstagedrc*
+**/jest.config.*

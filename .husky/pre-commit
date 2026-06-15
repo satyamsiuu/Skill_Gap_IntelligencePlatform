@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+# SGIP — Pre-commit Hook
+# Runs lint-staged: ESLint + Prettier on all staged files.
+# See .lintstagedrc.json for per-app configuration.
+# Blocking: any lint error or formatting issue prevents the commit.
+pnpm exec lint-staged

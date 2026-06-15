@@ -1,0 +1,493 @@
+/**
+ * SGIP — Global Stylesheet & Design Token System
+ * Ticket: SGIP-1.2.2.2
+ * Source: Document 4 — Frontend Specification (§3–5, §16–17)
+ *
+ * Architecture:
+ * - CSS custom properties define the token layer (dark + light)
+ * - @theme block exposes tokens to Tailwind v4 utilities
+ * - Data attributes [data-theme="dark"|"light"] drive theme switching (no page reload)
+ * - Aurora gradient is RESTRICTED: Readiness Ring ≥90, onboarding hero, login/register wash ONLY (ADR-010)
+ * - All animation speeds obey prefers-reduced-motion (§16)
+ */
+
+@import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DARK THEME — Default (Document 4 §3.2–3.5)
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root,
+[data-theme="dark"] {
+  /* ── Surface / Neutral Scale (§3.2) ──────────────────────────────────────── */
+  --canvas: #0B0D10;           /* App background */
+  --surface: #13161B;          /* Cards, panels, sidebar */
+  --surface-raised: #1B1F26;   /* Modals, popovers, dropdowns, hover states on cards */
+  --border-subtle: #22262E;    /* Hairline dividers, card borders */
+  --border-strong: #343B47;    /* Input borders, focus-adjacent borders */
+
+  /* ── Text Scale (§3.2) ───────────────────────────────────────────────────── */
+  --text-primary: #F2F4F7;     /* Headings, primary content */
+  --text-secondary: #9AA4B2;   /* Supporting text, labels */
+  --text-tertiary: #646E7C;    /* Placeholder, disabled, metadata timestamps */
+
+  /* ── Accent / Brand (§3.3) ───────────────────────────────────────────────── */
+  --accent: #6E6AF6;           /* Primary buttons, active nav, links, focus ring */
+  --accent-hover: #857FFF;     /* Hover state for accent elements */
+  /* --accent-muted-bg applied inline via rgba(110, 106, 246, 0.12) */
+
+  /* ── Semantic / Readiness-Band Colors (§3.5) ─────────────────────────────── */
+  --status-strong: #3DD68C;       /* Readiness ≥75 / MATCHED */
+  --status-developing: #F2B84B;   /* Readiness 40–74 / PARTIAL */
+  --status-attention: #F2706B;    /* Readiness <40 / MISSING */
+  --status-neutral: #646E7C;      /* Not assessed / no role selected */
+
+  /* ── Aurora Gradient (§3.4) — RESTRICTED USE — see ADR-010 ──────────────── */
+  /* DO NOT use as card background, page texture, or generic decoration.       */
+  /* Permitted: (a) Readiness Ring arc at score ≥90, (b) onboarding hero wash  */
+  /* at 6–10% opacity, (c) login/register page wash.                           */
+  --aurora-start: #6E6AF6;  /* indigo */
+  --aurora-mid: #9F6BFF;    /* violet */
+  --aurora-end: #4FD1C5;    /* teal */
+  --aurora: linear-gradient(135deg, var(--aurora-start), var(--aurora-mid), var(--aurora-end));
+
+  /* ── Semantic Compound Tokens ────────────────────────────────────────────── */
+  --accent-muted-bg: rgba(110, 106, 246, 0.12);
+  --focus-ring: 0 0 0 2px var(--canvas), 0 0 0 4px var(--accent);
+  --card-border-radius: 12px;
+  --card-padding-desktop: 24px;
+  --card-padding-mobile: 16px;
+  --sidebar-width-full: 260px;
+  --sidebar-width-rail: 72px;
+  --content-max-width: 1440px;
+
+  /* ── Shadows (dark mode) ─────────────────────────────────────────────────── */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LIGHT THEME — Document 4 §3.6 (direct token inversion)
+   ═══════════════════════════════════════════════════════════════════════════ */
+[data-theme="light"] {
+  /* ── Surface / Neutral Scale ─────────────────────────────────────────────── */
+  --canvas: #FFFFFF;
+  --surface: #F6F7F9;
+  --surface-raised: #ECEEF2;
+  --border-subtle: #E1E4EA;
+  --border-strong: #C8CDD8;
+
+  /* ── Text Scale ──────────────────────────────────────────────────────────── */
+  --text-primary: #0D1117;
+  --text-secondary: #4B5563;
+  --text-tertiary: #9AA4B2;
+
+  /* ── Accent / Brand (deepened for contrast on light) ─────────────────────── */
+  --accent: #5046E5;
+  --accent-hover: #6E6AF6;
+  --accent-muted-bg: rgba(80, 70, 229, 0.08);
+
+  /* ── Semantic Colors (deepened for AA contrast on light backgrounds) ──────── */
+  --status-strong: #16A34A;
+  --status-developing: #D97706;
+  --status-attention: #DC2626;
+  --status-neutral: #6B7280;
+
+  /* ── Aurora (same stops, used at reduced opacity on light) ───────────────── */
+  --aurora-start: #6E6AF6;
+  --aurora-mid: #9F6BFF;
+  --aurora-end: #4FD1C5;
+  --aurora: linear-gradient(135deg, var(--aurora-start), var(--aurora-mid), var(--aurora-end));
+
+  /* ── Compound Tokens ─────────────────────────────────────────────────────── */
+  --focus-ring: 0 0 0 2px var(--canvas), 0 0 0 4px var(--accent);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.12);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.16);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TAILWIND v4 THEME INTEGRATION
+   Exposes CSS custom properties as Tailwind utilities.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@theme inline {
+  /* ── Colors ──────────────────────────────────────────────────────────────── */
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-muted-bg: var(--accent-muted-bg);
+
+  --color-status-strong: var(--status-strong);
+  --color-status-developing: var(--status-developing);
+  --color-status-attention: var(--status-attention);
+  --color-status-neutral: var(--status-neutral);
+
+  /* ── Typography (Document 4 §4.1) ───────────────────────────────────────── */
+  /* Display/Headings: Geist Sans */
+  --font-geist: var(--font-geist-sans), "Geist", system-ui, sans-serif;
+  /* Body/UI: Inter */
+  --font-inter: var(--font-inter-var), "Inter", system-ui, sans-serif;
+  /* Data/Numeric: Geist Mono */
+  --font-mono: var(--font-geist-mono), "Geist Mono", "JetBrains Mono", monospace;
+
+  /* Sans defaults to Inter for body text (Document 4 §4.1) */
+  --font-sans: var(--font-inter);
+
+  /* ── Type Scale (Document 4 §4.2) ───────────────────────────────────────── */
+  /* display-lg: 40px / 48px / 600 / Geist */
+  --text-display-lg: 2.5rem;       /* 40px */
+  --text-display-lg--line-height: 3rem; /* 48px */
+
+  /* display-md: 28px / 36px / 600 / Geist */
+  --text-display-md: 1.75rem;
+  --text-display-md--line-height: 2.25rem;
+
+  /* heading-md: 20px / 28px / 600 / Geist */
+  --text-heading-md: 1.25rem;
+  --text-heading-md--line-height: 1.75rem;
+
+  /* heading-sm: 16px / 24px / 600 / Geist */
+  --text-heading-sm: 1rem;
+  --text-heading-sm--line-height: 1.5rem;
+
+  /* body-md: 14px / 22px / 400 / Inter */
+  --text-body-md: 0.875rem;
+  --text-body-md--line-height: 1.375rem;
+
+  /* body-sm: 13px / 20px / 400 / Inter */
+  --text-body-sm: 0.8125rem;
+  --text-body-sm--line-height: 1.25rem;
+
+  /* caption: 12px / 16px / 500 / Inter */
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1rem;
+
+  /* data-lg: 36px / 40px / 500 / Geist Mono — Readiness score hero */
+  --text-data-lg: 2.25rem;
+  --text-data-lg--line-height: 2.5rem;
+
+  /* data-md: 18px / 24px / 500 / Geist Mono — in-table scores, proficiency */
+  --text-data-md: 1.125rem;
+  --text-data-md--line-height: 1.5rem;
+
+  /* data-sm: 12px / 16px / 500 / Geist Mono — timestamps, IDs */
+  --text-data-sm: 0.75rem;
+  --text-data-sm--line-height: 1rem;
+
+  /* ── Layout ──────────────────────────────────────────────────────────────── */
+  --radius-card: var(--card-border-radius);
+  --width-sidebar: var(--sidebar-width-full);
+  --width-sidebar-rail: var(--sidebar-width-rail);
+  --width-content-max: var(--content-max-width);
+
+  /* ── Animation (Document 4 §17) ─────────────────────────────────────────── */
+  --duration-micro: 150ms;    /* hover micro-interactions */
+  --duration-ring: 600ms;     /* Readiness Ring fill animation (ONLY use case) */
+  --duration-ai: 300ms;       /* AI insight skeleton → content crossfade */
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BASE STYLES
+   ═══════════════════════════════════════════════════════════════════════════ */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  /* Dark mode is default (Document 4 §3.1) */
+  background-color: var(--canvas);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;  /* body-md as default */
+  line-height: 1.5714;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  /* tabular figures for all numeric data (Document 4 §4.3) */
+  font-variant-numeric: tabular-nums;
+}
+
+body {
+  min-height: 100dvh;
+  background-color: var(--canvas);
+  color: var(--text-primary);
+}
+
+/* ── Focus rings (§16 — keyboard accessibility) ──────────────────────────── */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: 4px;
+}
+
+/* ── Scrollbars (dark-mode appropriate) ──────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--canvas);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TYPOGRAPHY UTILITY CLASSES (Document 4 §4.2)
+   Each class implements the exact spec: size, line-height, weight, typeface.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Display — Geist Sans, 600 weight */
+.text-display-lg {
+  font-family: var(--font-geist);
+  font-size: var(--text-display-lg);
+  line-height: var(--text-display-lg--line-height);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.text-display-md {
+  font-family: var(--font-geist);
+  font-size: var(--text-display-md);
+  line-height: var(--text-display-md--line-height);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+/* Headings — Geist Sans, 600 weight */
+.text-heading-md {
+  font-family: var(--font-geist);
+  font-size: var(--text-heading-md);
+  line-height: var(--text-heading-md--line-height);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.text-heading-sm {
+  font-family: var(--font-geist);
+  font-size: var(--text-heading-sm);
+  line-height: var(--text-heading-sm--line-height);
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+
+/* Body — Inter, 400 weight */
+.text-body-md {
+  font-family: var(--font-inter);
+  font-size: var(--text-body-md);
+  line-height: var(--text-body-md--line-height);
+  font-weight: 400;
+}
+
+.text-body-sm {
+  font-family: var(--font-inter);
+  font-size: var(--text-body-sm);
+  line-height: var(--text-body-sm--line-height);
+  font-weight: 400;
+}
+
+.text-caption {
+  font-family: var(--font-inter);
+  font-size: var(--text-caption);
+  line-height: var(--text-caption--line-height);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+/* Data — Geist Mono, 500 weight, tabular figures (Document 4 §4.3) */
+.text-data-lg {
+  font-family: var(--font-mono);
+  font-size: var(--text-data-lg);
+  line-height: var(--text-data-lg--line-height);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.text-data-md {
+  font-family: var(--font-mono);
+  font-size: var(--text-data-md);
+  line-height: var(--text-data-md--line-height);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.text-data-sm {
+  font-family: var(--font-mono);
+  font-size: var(--text-data-sm);
+  line-height: var(--text-data-sm--line-height);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   COMPONENT PRIMITIVES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Card / Surface ──────────────────────────────────────────────────────── */
+.card {
+  background-color: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--card-border-radius);
+  padding: var(--card-padding-desktop);
+}
+
+@media (max-width: 767px) {
+  .card {
+    padding: var(--card-padding-mobile);
+  }
+}
+
+.card-hover {
+  transition: background-color var(--duration-micro) ease,
+              border-color var(--duration-micro) ease;
+}
+
+.card-hover:hover {
+  background-color: var(--surface-raised);
+  border-color: var(--border-strong);
+}
+
+/* ── Aurora Wash (ADR-010 restricted use) ───────────────────────────────── */
+/* Only use this class on: login/register page, onboarding hero empty state. */
+/* The aurora is applied at LOW opacity (6–10%) as a wash, not a solid fill. */
+.aurora-wash {
+  background: var(--aurora);
+  opacity: 0.08;
+  pointer-events: none;
+}
+
+/* ── AI Insight Block (Document 4 §9.6) ─────────────────────────────────── */
+/* Applied to any AI-generated content block (score explanation, suggestions) */
+.ai-insight-block {
+  border-left: 2px solid var(--accent);
+  padding-left: 12px;
+  position: relative;
+}
+
+/* ── Skeleton Shimmer (Document 4 §13) ──────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--border-subtle) 0%,
+    var(--surface-raised) 50%,
+    var(--border-subtle) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite ease-in-out;
+  border-radius: 4px;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* ── Readiness Ring Update Pulse (Document 4 §13) ───────────────────────── */
+/* Applied to the ring container while TanStack Query is refetching the score */
+.ring-updating {
+  animation: ring-pulse var(--duration-micro) ease-in-out infinite alternate;
+}
+
+@keyframes ring-pulse {
+  from { filter: drop-shadow(0 0 0px var(--accent)); }
+  to   { filter: drop-shadow(0 0 6px var(--accent)); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   REDUCED MOTION (Document 4 §16 — accessibility)
+   All animations obey prefers-reduced-motion.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background: var(--border-subtle);
+  }
+
+  .ring-updating {
+    animation: none;
+    /* Communicate "updating" via border color instead of animation */
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LAYOUT UTILITIES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Content max-width container (Document 4 §5) */
+.content-container {
+  width: 100%;
+  max-width: var(--content-max-width);
+  margin-inline: auto;
+  padding-inline: 24px;
+}
+
+@media (max-width: 640px) {
+  .content-container {
+    padding-inline: 16px;
+  }
+}
+
+/* ── Persistent App Shell ────────────────────────────────────────────────── */
+.app-shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-width-full) 1fr;
+  grid-template-rows: auto 1fr;
+  min-height: 100dvh;
+  background-color: var(--canvas);
+}
+
+@media (max-width: 1279px) {
+  .app-shell {
+    grid-template-columns: var(--sidebar-width-rail) 1fr;
+  }
+}
+
+@media (max-width: 1023px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Dashboard grid (Document 4 §10) ────────────────────────────────────── */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 24px;
+  width: 100%;
+}
+
+@media (max-width: 1279px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(8, 1fr);
+    gap: 16px;
+  }
+}
+
+@media (max-width: 767px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}

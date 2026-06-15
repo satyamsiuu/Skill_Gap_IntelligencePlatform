@@ -1,0 +1,12 @@
+{
+  "apps/api/**/*.ts": [
+    "pnpm --filter @sgip/api exec eslint --fix",
+    "pnpm --filter @sgip/api exec prettier --write"
+  ],
+  "apps/web/**/*.{ts,tsx}": [
+    "pnpm --filter @sgip/web exec eslint --fix",
+    "pnpm --filter @sgip/web exec prettier --write"
+  ],
+  "packages/shared/**/*.ts": ["prettier --write"],
+  "*.{json,yaml,yml,md}": ["prettier --write"]
+}

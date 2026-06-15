@@ -1,0 +1,666 @@
+// SGIP — Prisma Schema
+// Document 2, Section 4.1–4.4 — Core Domain Model
+//
+// IMPORTANT: pgvector columns (embedding vector) and pg_trgm/HNSW/IVFFlat indexes
+// are NOT defined here — they require raw SQL migrations (see prisma/migrations/).
+// This is a documented limitation of Prisma's schema language (Document 2, Section 12).
+//
+// Extension management is in a dedicated raw SQL migration (SGIP-1.1.2.1).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Enums (mirrors @sgip/shared types — kept in sync manually)
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  STUDENT
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum SkillSource {
+  SELF
+  AI_SUGGESTED
+  AI_CONFIRMED
+}
+
+enum SkillStatus {
+  CONFIRMED
+  PENDING_REVIEW
+}
+
+enum RequirementImportance {
+  REQUIRED
+  IMPORTANT
+  NICE_TO_HAVE
+}
+
+enum GapClassification {
+  MATCHED
+  PARTIAL
+  MISSING
+}
+
+enum DocumentType {
+  RESUME
+  CERTIFICATE
+  PROJECT_EVIDENCE
+}
+
+enum FileScanStatus {
+  QUARANTINED
+  AVAILABLE
+  REJECTED
+}
+
+enum NormalizationEntityType {
+  SKILL
+  ROLE
+}
+
+enum NormalizationReviewStatus {
+  PENDING
+  APPROVED
+  MERGED
+  REJECTED
+}
+
+enum RoadmapItemStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+enum AuditSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AIProvider {
+  GROQ
+  OPENAI
+  ANTHROPIC
+}
+
+enum AIFeature {
+  RESUME_EXTRACTION
+  SCORE_EXPLANATION
+  ROADMAP_ENRICHMENT
+  NORMALIZATION_DISAMBIGUATION
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Organization (future multi-tenant support — ADR-009)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  domain      String?  @unique // e.g., "university.edu" for institutional accounts
+  logoUrl     String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime? // Soft delete (ADR-017)
+
+  users       User[]
+  profiles    StudentProfile[]
+
+  @@index([domain])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Identity & Authentication
+// ─────────────────────────────────────────────────────────────────────────────
+
+model User {
+  id               String      @id @default(cuid())
+  email            String      @unique // Stored as lowercase (normalized on registration)
+  passwordHash     String      // Argon2id hash — NEVER store plaintext (Document 3, Section 6)
+  role             UserRole    @default(STUDENT)
+  status           UserStatus  @default(ACTIVE)
+  emailVerifiedAt  DateTime?   // null = unverified
+  tokenVersion     Int         @default(0) // Incremented on password change / force logout (Document 3, Section 3)
+
+  // Multi-tenant support (nullable — ADR-009)
+  organizationId   String?
+  organization     Organization? @relation(fields: [organizationId], references: [id])
+
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  deletedAt        DateTime?   // Soft delete (ADR-017)
+
+  // Relations
+  studentProfile   StudentProfile?
+  refreshTokens    RefreshToken[]
+  auditLogs        AuditLog[]
+
+  @@index([email])
+  @@index([organizationId])
+}
+
+model RefreshToken {
+  id          String   @id @default(cuid())
+  tokenHash   String   @unique // SHA-256 hash of the raw token — NEVER store raw (ADR-014)
+  familyId    String   // Groups rotation chain; revoked entire family on reuse detection
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Metadata for the "active sessions" list (Document 3, Section 5)
+  deviceInfo  String?  // User-Agent or device fingerprint
+  ipAddress   String?
+  lastUsedAt  DateTime @default(now())
+  expiresAt   DateTime
+  revokedAt   DateTime? // null = still valid; set when revoked
+
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([familyId])
+  @@index([tokenHash])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Student Profile (Document 2, Section 4.1)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model StudentProfile {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Multi-tenant support (nullable — ADR-009)
+  organizationId     String?
+  organization       Organization? @relation(fields: [organizationId], references: [id])
+
+  // Profile fields (FR-PROFILE-01)
+  firstName          String?
+  lastName           String?
+  bio                String?
+  location           String?
+  avatarUrl          String?  // Cloudinary URL (signed — Document 3, Section 7.2)
+
+  // Education details
+  program            String?  // e.g., "Computer Science"
+  branch             String?  // e.g., "AI & ML"
+  institution        String?
+  graduationYear     Int?
+
+  // Onboarding progress (SGIP-3.1.2.2)
+  onboardingStep     Int      @default(0) // 0=not started, 4=complete (profile+skills+resume+role)
+  onboardingComplete Boolean  @default(false)
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  deletedAt          DateTime? // Soft delete (ADR-017)
+
+  // Relations
+  skills             StudentSkill[]
+  targetRoles        StudentTargetRole[]
+  documents          Document[]
+
+  @@index([userId])
+  @@index([organizationId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Skill Taxonomy (Document 2, Section 4.2)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Skill {
+  id          String   @id @default(cuid())
+  name        String   @unique // Canonical skill name (e.g., "TypeScript")
+  category    String   // e.g., "Frontend", "Backend", "DevOps", "Data", "Soft Skills"
+  description String?
+  isFoundational Boolean @default(false) // Used in roadmap prioritization (SGIP-6.3.1.1)
+
+  // NOTE: `embedding vector(768)` column added via raw SQL migration (SGIP-4.1.2.2).
+  // Prisma cannot define vector columns natively — see migrations/ for the raw SQL.
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime? // Soft delete (ADR-017)
+
+  // Relations
+  aliases          SkillAlias[]
+  studentSkills    StudentSkill[]
+  requirements     RoleRequirement[]
+  candidates       SkillCandidate[]
+  defaultResources DefaultSkillResource[]
+  certificates     Certificate[]
+  projectTags      ProjectEvidenceSkill[]
+
+  @@index([name])
+  @@index([category])
+}
+
+model SkillAlias {
+  id       String @id @default(cuid())
+  name     String @unique // e.g., "JS", "ReactJS"
+  skillId  String
+  skill    Skill  @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([name])
+  @@index([skillId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Role Taxonomy (Document 2, Section 4.3)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique // Canonical role name (e.g., "Full Stack Developer")
+  description String?
+  category    String?  // e.g., "Engineering", "Data", "Design", "Management"
+
+  // NOTE: `embedding vector(768)` column added via raw SQL migration (SGIP-5.1.1.1).
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime? // Soft delete (ADR-017)
+
+  // Relations
+  aliases         RoleAlias[]
+  requirementSets RoleRequirementSet[]
+  targetRoles     StudentTargetRole[]
+  candidates      RoleCandidate[]
+
+  @@index([name])
+}
+
+model RoleAlias {
+  id      String @id @default(cuid())
+  name    String @unique // e.g., "Artificial Intelligence Engineer"
+  roleId  String
+  role    Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([name])
+  @@index([roleId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Role Requirement Sets (Versioned — ADR-005, Document 2, Section 4.4)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model RoleRequirementSet {
+  id            String   @id @default(cuid())
+  roleId        String
+  role          Role     @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  version       Int      // Incremented with each new version
+  isActive      Boolean  @default(true)
+  // Only one active version per role at a time — enforced at application layer
+  // (not DB constraint, since the transition is transactional, not single-statement)
+  effectiveFrom DateTime @default(now())
+  publishedBy   String?  // adminUserId — who published this version
+  notes         String?  // Change rationale for audit trail
+
+  createdAt     DateTime @default(now())
+
+  // Relations
+  requirements     RoleRequirement[]
+  readinessSnapshots ReadinessSnapshot[]
+
+  @@unique([roleId, version])
+  @@index([roleId, isActive])
+}
+
+model RoleRequirement {
+  id                 String                @id @default(cuid())
+  requirementSetId   String
+  requirementSet     RoleRequirementSet    @relation(fields: [requirementSetId], references: [id], onDelete: Cascade)
+  skillId            String
+  skill              Skill                 @relation(fields: [skillId], references: [id], onDelete: Restrict)
+  importance         RequirementImportance
+  targetProficiency  Int                   // 1–5 (ADR-007)
+
+  // Validated at application layer: 1 <= targetProficiency <= 5
+
+  @@unique([requirementSetId, skillId])
+  @@index([requirementSetId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Student Skills (Document 2, Section 4.2)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model StudentSkill {
+  id               String      @id @default(cuid())
+  studentProfileId String
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  skillId          String
+  skill            Skill       @relation(fields: [skillId], references: [id], onDelete: Restrict)
+  proficiency      Int         // 1–5 (ADR-007)
+  source           SkillSource @default(SELF)
+  // CRITICAL (ADR-004, FR-SKILL-03): Only CONFIRMED status contributes to readiness score.
+  // AI-suggested skills start as PENDING_REVIEW and never auto-confirm.
+  status           SkillStatus @default(CONFIRMED)
+
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  // StudentSkill is a HARD DELETE (not soft-delete — ADR-017 footnote).
+  // Historical point-in-time data is preserved in ReadinessSnapshot.breakdown JSONB.
+
+  @@unique([studentProfileId, skillId])
+  @@index([studentProfileId])
+  @@index([skillId])
+  @@index([studentProfileId, status]) // For score calculation filtering CONFIRMED only
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Student Target Roles (Document 2, Section 4.2)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model StudentTargetRole {
+  id               String   @id @default(cuid())
+  studentProfileId String
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  roleId           String
+  role             Role     @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  isActive         Boolean  @default(true)
+  // Max 3 active per student (ADR-008) — enforced at application layer with transactional check.
+  // Set isActive=false to deselect (not delete — preserves ReadinessSnapshot linkage).
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  readinessSnapshots ReadinessSnapshot[]
+  roadmapItems       RoadmapItem[]
+
+  @@unique([studentProfileId, roleId])
+  @@index([studentProfileId, isActive]) // For dashboard: get active target roles
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Gap Analysis & Scoring (Document 2, Section 4.5)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model ReadinessSnapshot {
+  id                  String             @id @default(cuid())
+  studentTargetRoleId String
+  studentTargetRole   StudentTargetRole  @relation(fields: [studentTargetRoleId], references: [id], onDelete: Cascade)
+  requirementSetId    String
+  requirementSet      RoleRequirementSet @relation(fields: [requirementSetId], references: [id], onDelete: Restrict)
+  score               Float?             // null = role has zero requirements (ADR-012 edge case)
+
+  // JSONB breakdown (ADR-013): stores per-requirement detail at calculation time.
+  // Rendered by Gap Report Matrix without re-querying RoleRequirement (stability guarantee).
+  // Structure: BreakdownItem[] from @sgip/shared
+  breakdown           Json               @default("[]")
+
+  // AI explanation (added asynchronously by score.explain job)
+  templateExplanation String?            // Always generated synchronously at snapshot creation
+  aiExplanation       String?            // Set later by AI job — never blocks score display
+
+  calculatedAt        DateTime           @default(now())
+
+  // Relations
+  roadmapItems        RoadmapItem[]
+
+  @@index([studentTargetRoleId])
+  @@index([requirementSetId])
+  @@index([studentTargetRoleId, calculatedAt]) // For history queries
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Roadmap (Document 2, Section 4.4)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model RoadmapItem {
+  id                  String            @id @default(cuid())
+  studentTargetRoleId String
+  studentTargetRole   StudentTargetRole @relation(fields: [studentTargetRoleId], references: [id], onDelete: Cascade)
+  readinessSnapshotId String
+  readinessSnapshot   ReadinessSnapshot @relation(fields: [readinessSnapshotId], references: [id], onDelete: Cascade)
+  skillId             String
+  priorityOrder       Int               // Determined by the deterministic priority algorithm (SGIP-6.3.1.1)
+  status              RoadmapItemStatus @default(TODO)
+
+  // AI-suggested resources (set by roadmap.enrich job)
+  resources           Json              @default("[]") // Array of { title, url, type }
+
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  @@index([studentTargetRoleId, status])
+  @@index([readinessSnapshotId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Documents & Files (Document 2, Section 4.1; Document 3, Section 7)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Document {
+  id               String         @id @default(cuid())
+  studentProfileId String
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  type             DocumentType
+  storageKey       String         @unique // UUID-based key (Document 3, §7.2) — NOT the original filename
+  originalFilename String         // Display only — never used as storage key
+  mimeType         String         // Verified via magic bytes (ADR-015)
+  sizeBytes        Int
+  scanStatus       FileScanStatus @default(QUARANTINED)
+  scannedAt        DateTime?      // When the virus scan completed
+
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  // Relations
+  resume           Resume?
+  certificate      Certificate?
+  projectEvidence  ProjectEvidence?
+
+  @@index([studentProfileId, type])
+  @@index([scanStatus]) // For quarantine lifecycle queries
+}
+
+model Resume {
+  id          String   @id @default(cuid())
+  documentId  String   @unique
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  parseStatus String   @default("PENDING") // PENDING, PROCESSING, COMPLETE, FAILED
+  parsedAt    DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Certificate {
+  id               String   @id @default(cuid())
+  documentId       String   @unique
+  document         Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  skillId          String?  // nullable: tagged to canonical skill
+  skill            Skill?   @relation(fields: [skillId], references: [id], onDelete: SetNull)
+  issuingOrg       String?
+  issueDate        DateTime?
+  expiryDate       DateTime?
+  credentialId     String?  // External certificate ID
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model ProjectEvidence {
+  id               String   @id @default(cuid())
+  documentId       String?  @unique // nullable — project may have a URL but no file
+  document         Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  studentProfileId String
+  title            String
+  description      String?
+  externalUrl      String?  // GitHub, portfolio, etc. — stored as link only (SSRF note: ADR-015 / ISSUE-008)
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  skills           ProjectEvidenceSkill[]
+
+  @@index([studentProfileId])
+}
+
+model ProjectEvidenceSkill {
+  id                String          @id @default(cuid())
+  projectEvidenceId String
+  projectEvidence   ProjectEvidence @relation(fields: [projectEvidenceId], references: [id], onDelete: Cascade)
+  skillId           String
+  skill             Skill           @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([projectEvidenceId, skillId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Normalization Engine (Document 2, Section 6.3)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model SkillCandidate {
+  id            String   @id @default(cuid())
+  rawText       String   // The original search text that was submitted
+  normalizedText String? // Lowercased, trimmed version for deduplication
+  proposedSkillId String? // Provisional link to nearest canonical skill
+  proposedSkill Skill?  @relation(fields: [proposedSkillId], references: [id], onDelete: SetNull)
+  submittedBy   String  // userId
+  createdAt     DateTime @default(now())
+
+  reviewItem    NormalizationReviewItem?
+
+  @@unique([normalizedText]) // Idempotent: same text = same candidate (SGIP-4.2.2.1)
+  @@index([proposedSkillId])
+}
+
+model RoleCandidate {
+  id            String   @id @default(cuid())
+  rawText       String
+  normalizedText String?
+  proposedRoleId String?
+  proposedRole  Role?   @relation(fields: [proposedRoleId], references: [id], onDelete: SetNull)
+  submittedBy   String  // userId
+  createdAt     DateTime @default(now())
+
+  reviewItem    NormalizationReviewItem?
+
+  @@unique([normalizedText])
+  @@index([proposedRoleId])
+}
+
+model NormalizationReviewItem {
+  id                String                    @id @default(cuid())
+  entityType        NormalizationEntityType
+  skillCandidateId  String?                   @unique
+  skillCandidate    SkillCandidate?            @relation(fields: [skillCandidateId], references: [id], onDelete: Cascade)
+  roleCandidateId   String?                   @unique
+  roleCandidate     RoleCandidate?             @relation(fields: [roleCandidateId], references: [id], onDelete: Cascade)
+  confidenceScore   Float                     // Cosine similarity from embedding search
+  status            NormalizationReviewStatus @default(PENDING)
+  reviewedBy        String?                   // adminUserId
+  reviewedAt        DateTime?
+  reviewerNote      String?
+  aiDisambiguationNote String?               // Optional AI-generated note (SGIP-7.2.4.1)
+
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+
+  @@index([entityType, status]) // For admin review queue filtering
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AI Features
+// ─────────────────────────────────────────────────────────────────────────────
+
+model AIUsageLog {
+  id              String      @id @default(cuid())
+  provider        AIProvider
+  feature         AIFeature
+  inputTokens     Int?
+  outputTokens    Int?
+  latencyMs       Int
+  estimatedCostUsd Float?
+  success         Boolean
+  errorMessage    String?
+  cacheHit        Boolean     @default(false)
+  userId          String?     // null for shared/cached responses
+  correlationId   String?     // Link to the API request that triggered this
+
+  createdAt       DateTime    @default(now())
+
+  @@index([provider, feature, createdAt]) // For usage dashboard aggregation
+  @@index([createdAt])
+}
+
+model DefaultSkillResource {
+  id        String  @id @default(cuid())
+  skillId   String
+  skill     Skill   @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  title     String
+  url       String
+  type      String  // "VIDEO", "ARTICLE", "COURSE", "DOCUMENTATION", "PRACTICE"
+  createdBy String  // adminUserId
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([skillId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Audit Log (Document 2, Section 6.2; Document 3, Section 12)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id          String        @id @default(cuid())
+  userId      String?       // null for system-initiated actions
+  user        User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action      String        // e.g., "AUTH_REGISTER", "SKILL_ADD", "ADMIN_REQUIREMENT_PUBLISH"
+  resource    String?       // e.g., "StudentSkill", "RoleRequirementSet"
+  resourceId  String?       // The ID of the affected resource
+  severity    AuditSeverity @default(LOW)
+  metadata    Json?         // Additional context (before/after diff for admin mutations)
+  ipAddress   String?
+  userAgent   String?
+  correlationId String?
+
+  createdAt   DateTime      @default(now())
+
+  @@index([userId])
+  @@index([action, createdAt])
+  @@index([severity, createdAt]) // For security alerting on HIGH/CRITICAL events
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Platform Configuration (ADR-020)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model PlatformConfig {
+  key         String   @id
+  value       String   // JSON-encoded value
+  description String?  // Human-readable explanation of what this config controls
+  updatedBy   String?  // adminUserId
+  updatedAt   DateTime @updatedAt
+
+  // Key examples:
+  // "scoring.weight.REQUIRED" = "3"
+  // "scoring.weight.IMPORTANT" = "2"
+  // "scoring.weight.NICE_TO_HAVE" = "1"
+  // "normalization.threshold.autoLink" = "0.92"
+  // "normalization.threshold.review" = "0.75"
+  // "ai.provider.RESUME_EXTRACTION" = "GROQ"
+  // "circuit.breaker.failureThreshold.GROQ" = "5"
+}

@@ -1,0 +1,48 @@
+# SGIP Monorepo — .gitignore
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Environment files — NEVER commit secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+# .env.example is intentionally NOT ignored — it documents required variables
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Prisma — generated client is gitignored (generated during build)
+apps/api/src/generated/
+apps/api/prisma/generated/
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Turbo cache (if added later)
+.turbo/
