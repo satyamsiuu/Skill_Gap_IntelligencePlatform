@@ -46,3 +46,16 @@ apps/api/prisma/generated/
 
 # Turbo cache (if added later)
 .turbo/
+
+# Project Reference Documents
+01-PRD.md
+02-Technical-Architecture.md
+03-Security-Access-Control.md
+04-Frontend-Specification.md
+05-Feature-Ticket-List.md
+ARCHITECTURE_DECISIONS.md
+IMPLEMENTATION_LOG.md
+IMPLEMENTATION_STRATEGY.md
+KNOWN_ISSUES.md
+PROJECT_PROGRESS.md
+SESSION_HANDOFF.md
